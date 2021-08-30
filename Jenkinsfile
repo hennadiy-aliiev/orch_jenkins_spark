@@ -16,8 +16,9 @@ pipeline {
             }
             steps {
                 echo 'Testing..'
+                sh 'pip install -U pip && pip install venv'
                 sh 'python -m venv venv && source venv/bin/activate'
-                sh 'pip install -U pip && pip install venv && pip install -r requirements.txt'
+                sh 'pip install -r requirements.txt'
                 sh 'pytest tests --junitxml=test-results/results.xml'
                 junit 'test-results/results.xml'
             }

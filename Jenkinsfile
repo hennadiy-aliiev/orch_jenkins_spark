@@ -18,8 +18,8 @@ pipeline {
                 echo 'Testing..'
                 sh 'python3 -m venv venv && . venv/bin/activate'
                 sh 'python --version'
-                sh 'pip install -U pip && pip install -r requirements.txt'
-                sh 'pytest tests --junitxml=test-results/results.xml'
+                sh 'pip3 install -U pip && pip3 install -r requirements.txt'
+                sh 'python3 -m pytest tests --junitxml=test-results/results.xml'
                 junit 'test-results/results.xml'
             }
         }

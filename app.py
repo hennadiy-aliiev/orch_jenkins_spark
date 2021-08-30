@@ -1,20 +1,8 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json
 
+from dependencies.config.hosts import KAFKA_HOST, HDFS_HOST
 from dependencies.schemas import kafka_schema
-
-HDFS_HOST = "hdfs://192.168.49.1:9000"
-KAFKA_HOST = "10.107.23.188:9092"
-
-appName = "PySpark Example"
-master = "local[*]"
-spark = SparkSession.builder \
-    .appName(appName) \
-    .master(master) \
-    .enableHiveSupport() \
-    .getOrCreate()
-
-spark.sql("use test_db")
 
 
 def extract_kafka_data(df):
@@ -26,7 +14,7 @@ def extract_kafka_data(df):
     return df.drop('name')
 
 
-def read_kafka():
+def read_kafka(spark):
     df = spark \
       .read \
       .format("kafka") \
@@ -38,7 +26,7 @@ def read_kafka():
     return extract_kafka_data(df)
 
 
-def read_hdfs():
+def read_hdfs(spark):
     return spark.read.format("avro").load(f"{HDFS_HOST}/expedia")
 
 
@@ -47,11 +35,21 @@ def get_idle_hotel_ids(df):
 
 
 def main():
+    appName = "PySpark Example"
+    master = "local[*]"
+    spark = SparkSession.builder \
+        .appName(appName) \
+        .master(master) \
+        .enableHiveSupport() \
+        .getOrCreate()
+
+    spark.sql("use test_db")
+
     # Read hotels&weather data from Kafka with Spark application in a batch manner
-    df_kafka_hotel_weather = read_kafka().cache()
+    df_kafka_hotel_weather = read_kafka(spark).cache()
 
     # Read Expedia data from HDFS with Spark.
-    df_expedia = read_hdfs()
+    df_expedia = read_hdfs(spark)
 
     # Calculate idle days (days betweeen current and previous check in dates) for every hotel.
     unique_days = df_expedia.select("srch_ci").where("srch_ci is not null").distinct().count()

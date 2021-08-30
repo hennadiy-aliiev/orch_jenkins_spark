@@ -5,7 +5,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building..'
-                sh 'docker build -t spark/batching:${env.BUILD_ID} .'
+                sh "docker build -t spark/batching:${env.BUILD_ID} ."
             }
         }
         stage('Test') {

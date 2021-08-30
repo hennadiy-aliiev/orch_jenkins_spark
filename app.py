@@ -17,7 +17,15 @@ spark = SparkSession.builder \
 spark.sql("use test_db")
 
 
-# Read hotels&weather data from Kafka with Spark application in a batch manner
+def extract_kafka_data(df):
+    df = df \
+      .selectExpr("cast (value as string) as json") \
+      .select(from_json("json", kafka_schema).alias("data")) \
+      .select("data.id", "data.name", "data.avg_tmpr_c", "data.avg_tmpr_f", "data.wthr_date", "data.day", "data.month", "data.year") \
+      .selectExpr("id", "name", "cast (avg_tmpr_c as float) as avg_tmpr_c", "cast (avg_tmpr_f as float) as avg_tmpr_f", "wthr_date", "day", "month", "year")
+    return df.drop('name')
+
+
 def read_kafka():
     df = spark \
       .read \
@@ -27,12 +35,7 @@ def read_kafka():
       .option("startingOffsets", "earliest") \
       .option("endingOffsets", "latest") \
       .load()
-    df = df \
-      .selectExpr("cast (value as string) as json") \
-      .select(from_json("json", kafka_schema).alias("data")) \
-      .select("data.id", "data.name", "data.avg_tmpr_c", "data.avg_tmpr_f", "data.wthr_date", "data.day", "data.month", "data.year") \
-      .selectExpr("id", "name", "cast (avg_tmpr_c as float) as avg_tmpr_c", "cast (avg_tmpr_f as float) as avg_tmpr_f", "wthr_date", "day", "month", "year")
-    return df.drop('name')
+    return extract_kafka_data(df)
 
 
 def read_hdfs():
@@ -44,6 +47,7 @@ def get_idle_hotel_ids(df):
 
 
 def main():
+    # Read hotels&weather data from Kafka with Spark application in a batch manner
     df_kafka_hotel_weather = read_kafka().cache()
 
     # Read Expedia data from HDFS with Spark.

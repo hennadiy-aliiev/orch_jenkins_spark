@@ -1,12 +1,5 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json
-from pyspark.sql.types import (
-    StructField,
-    StructType,
-    StringType,
-    IntegerType,
-    DateType
-)
 
 from dependencies.schemas import kafka_schema
 
@@ -23,6 +16,7 @@ spark = SparkSession.builder \
 
 spark.sql("use test_db")
 
+
 # Read hotels&weather data from Kafka with Spark application in a batch manner
 def read_kafka():
     df = spark \
@@ -38,19 +32,27 @@ def read_kafka():
       .select(from_json("json", kafka_schema).alias("data")) \
       .select("data.id", "data.name", "data.avg_tmpr_c", "data.avg_tmpr_f", "data.wthr_date", "data.day", "data.month", "data.year") \
       .selectExpr("id", "name", "cast (avg_tmpr_c as float) as avg_tmpr_c", "cast (avg_tmpr_f as float) as avg_tmpr_f", "wthr_date", "day", "month", "year")
-    return df.drop('name').cache()
+    return df.drop('name')
+
+
+def read_hdfs():
+    return spark.read.format("avro").load(f"{HDFS_HOST}/expedia")
+
+
+def get_idle_hotel_ids(df):
+    return [item.hotel_id for item in df.collect()]
 
 
 def main():
-    df_kafka_hotel_weather = read_kafka()
+    df_kafka_hotel_weather = read_kafka().cache()
 
     # Read Expedia data from HDFS with Spark.
-    df_expedia = spark.read.format("avro").load(f"{HDFS_HOST}/expedia")
+    df_expedia = read_hdfs()
 
     # Calculate idle days (days betweeen current and previous check in dates) for every hotel.
     unique_days = df_expedia.select("srch_ci").where("srch_ci is not null").distinct().count()
     df_hotels_with_idle_days = spark.sql(f"select hotel_id, ({unique_days} - count(*)) as idle_days from (select distinct hotel_id, srch_ci from expedia_ext order by hotel_id, srch_ci) where srch_ci is not null group by hotel_id having count(*) < {unique_days}")
-    hotel_ids_idle = [item.hotel_id for item in df_hotels_with_idle_days.collect()]
+    hotel_ids_idle = get_idle_hotel_ids(df_hotels_with_idle_days)
 
     # Remove all booking data for hotels with at least one "invalid" row
     df_hotels = spark.sql("select * from hotelwithgeohash_int")
